@@ -3,22 +3,25 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-[RequireComponent(typeof(MeshRenderer), typeof(MeshFilter))]
-public class Chunk : MonoBehaviour {
+public class Chunk {
 
 	public const int ChunkSize = 16;
 
 	public static Vector3Int Dimensions => new Vector3Int(ChunkSize, ChunkSize, ChunkSize);
 
-	public Vector3Int ChunkIndex { get; private set; }
-	public Vector3Int Position => ChunkIndex * ChunkSize;
-
 	private Voxel[,,] voxels;
-	private MeshRenderer meshRenderer;
-	private MeshFilter filter;
 
-	public void Initialise(Vector3Int index) {
-		ChunkIndex = index;
+
+	public bool IsEmpty() {
+		foreach (var voxel in voxels) {
+			if (voxel.IsVisible)
+				return false;
+		}
+
+		return true;
+	}
+
+	public Chunk() {
 		voxels = new Voxel[Dimensions.x, Dimensions.y, Dimensions.z];
 	}
 
@@ -42,21 +45,14 @@ public class Chunk : MonoBehaviour {
 		}
 	}
 
-	private void Awake() {
-		meshRenderer = GetComponent<MeshRenderer>();
-		filter = GetComponent<MeshFilter>();
-
-		if (meshRenderer.sharedMaterial == null)
-			meshRenderer.sharedMaterial = new Material(Shader.Find("Shader Graphs/VoxelShader"));
-
-		if (filter.sharedMesh == null)
-			filter.sharedMesh = new Mesh();
-	}
-
-	public void GenerateAndApplyMesh() {
-		var meshDat = GenerateMesh();
-
-		meshDat.ApplyTo(filter.sharedMesh);
+	public void FillRange(Vector3Int start, Vector3Int end, byte r, byte g, byte b, byte a = 255) {
+		for (int z = start.z; z <= end.z; z++) {
+			for (int y = start.y; y <= end.y; y++) {
+				for (int x = start.x; x <= end.x; x++) {
+					this[new Vector3Int(x, y, z)] = new Voxel(r, g, b, a);
+				}
+			}
+		}
 	}
 
 	public MeshData GenerateMesh() {

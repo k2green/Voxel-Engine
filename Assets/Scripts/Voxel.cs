@@ -22,11 +22,5 @@ public struct Voxel {
 
 	public Voxel(Color32 color) : this(color.r, color.g, color.b, color.a) { }
 
-	public override bool Equals(object obj) {
-		if (!(obj is Voxel voxel)) return false;
-
-		return R == voxel.R && G == voxel.G && B == voxel.B && A == voxel.A;
-	}
-
 	public Color32 GetColor() => new Color32(R, G, B, A);
 }
