@@ -28,17 +28,28 @@ public class ChunkObject : MonoBehaviour {
 		IsDirty = true;
 	}
 
-	public void Initialise(Chunk chunkData) {
+	public void Initialise() {
 		meshFilter = GetComponent<MeshFilter>();
 		meshRenderer = GetComponent<MeshRenderer>();
-		chunk = chunkData;
-		IsDirty = true;
 
 		if (meshFilter.sharedMesh == null)
 			meshFilter.sharedMesh = new Mesh();
 
 		if (meshRenderer.sharedMaterial == null)
 			meshRenderer.sharedMaterial = new Material(Shader.Find("Shader Graphs/VoxelShader"));
+
+		gameObject.SetActive(false);
+	}
+
+	public void Setup(Chunk chunkData) {
+		chunk = chunkData;
+		IsDirty = true;
+	}
+
+	public void Clear() {
+		chunk = null;
+		meshFilter.sharedMesh.Clear();
+		gameObject.SetActive(false);
 	}
 
 	public void UpdateMesh() {

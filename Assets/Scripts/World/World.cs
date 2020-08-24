@@ -12,6 +12,7 @@ public class World : MonoBehaviour {
 	public int loadRange = 3;
 
 	private WorldGenerator worldGen;
+	private ChunkPool chunkPool;
 	private Dictionary<Vector3Int, Chunk> loadedChunks;
 	private Dictionary<Vector3Int, ChunkObject> visibleChunks;
 	private HashSet<Vector3Int> markedForUnload;
@@ -20,6 +21,7 @@ public class World : MonoBehaviour {
 		Instance = this;
 
 		worldGen = new WorldGenerator(noiseFilter);
+		chunkPool = new ChunkPool((int)Mathf.Pow(loadRange * 2, 3), transform);
 		loadedChunks = new Dictionary<Vector3Int, Chunk>();
 		visibleChunks = new Dictionary<Vector3Int, ChunkObject>();
 		markedForUnload = new HashSet<Vector3Int>();
@@ -42,10 +44,8 @@ public class World : MonoBehaviour {
 
 	public void UnloadChunk(Vector3Int chunkIndex) {
 		if (visibleChunks.ContainsKey(chunkIndex)) {
-			var chunkObj = visibleChunks[chunkIndex];
-
+			visibleChunks[chunkIndex].Clear();
 			visibleChunks.Remove(chunkIndex);
-			GameObject.Destroy(chunkObj.gameObject);
 		}
 
 		loadedChunks.Remove(chunkIndex);
@@ -83,7 +83,8 @@ public class World : MonoBehaviour {
 				markedForUnload.Add(chunkIndex);
 			} else {
 				if (!visibleChunks.ContainsKey(chunkIndex))
-					CreateChunkObject(chunkIndex);
+					if (!CreateChunkObject(chunkIndex))
+						continue;
 
 				var chunkObj = visibleChunks[chunkIndex];
 
@@ -100,21 +101,20 @@ public class World : MonoBehaviour {
 		markedForUnload.Clear();
 	}
 
-	private void CreateChunkObject(Vector3Int chunkIndex) {
-		var worldPos = ChunkToWorldCoord(chunkIndex);
+	private bool CreateChunkObject(Vector3Int chunkIndex) {
+		if (chunkPool.TryGetPooledObject(out var chunkObj)) {
+			var worldPos = ChunkToWorldCoord(chunkIndex);
 
-		var gameObj = new GameObject($"Chunk {chunkIndex}");
+			chunkObj.transform.position = worldPos;
+			chunkObj.gameObject.SetActive(true);
 
-		gameObj.transform.position = worldPos;
-		gameObj.transform.parent = transform;
+			chunkObj.Setup(loadedChunks[chunkIndex]);
 
-		gameObj.AddComponent<MeshFilter>();
-		gameObj.AddComponent<MeshRenderer>();
+			visibleChunks.Add(chunkIndex, chunkObj);
+			return true;
+		}
 
-		var chunkObj = gameObj.AddComponent<ChunkObject>();
-		chunkObj.Initialise(loadedChunks[chunkIndex]);
-
-		visibleChunks.Add(chunkIndex, chunkObj);
+		return false;
 	}
 
 	private Vector3Int ChunkToWorldCoord(Vector3Int chunkIndex) => MultElements(chunkIndex, Chunk.Dimensions);
