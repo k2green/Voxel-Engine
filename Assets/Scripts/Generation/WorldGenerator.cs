@@ -4,40 +4,38 @@ using UnityEngine;
 
 public class WorldGenerator {
 
-	private Dictionary<Vector2Int, float> heightMap;
+	private Dictionary<Vector2Int, float[,]> heightMaps;
 	private NoiseFilter noiseFilter;
 
 	public WorldGenerator(NoiseFilter filter) {
 		noiseFilter = filter;
-		heightMap = new Dictionary<Vector2Int, float>();
+		heightMaps = new Dictionary<Vector2Int, float[,]>();
 	}
 
-	public float GetHeight(Vector2Int point) {
-		if (!heightMap.ContainsKey(point))
-			heightMap.Add(point, noiseFilter.EvaluateNoise(point));
+	public float[,] GetHeightMap(Vector3Int chunkIndex) {
+		var flatIndex = GetVectorXZ(chunkIndex);
 
-		return heightMap[point];
+		if (!heightMaps.ContainsKey(flatIndex))
+			CreateHeightMap(flatIndex);
+
+		return heightMaps[flatIndex];
 	}
 
-	public Chunk GenerateChunk(Vector3Int chunkIndex) {
-		var chunk = new Chunk();
-		var chunkCoords = new Vector3Int(chunkIndex.x * Chunk.Dimensions.x, chunkIndex.y * Chunk.Dimensions.y, chunkIndex.z * Chunk.Dimensions.z);
+	private void CreateHeightMap(Vector2Int flatIndex) {
+		var heightMap = new float[Chunk.Dimensions.x, Chunk.Dimensions.z];
+		var sampleBase = new Vector2(flatIndex.x * Chunk.Dimensions.x, flatIndex.y * Chunk.Dimensions.z);
 
 		for (int z = 0; z < Chunk.Dimensions.z; z++) {
 			for (int x = 0; x < Chunk.Dimensions.x; x++) {
-				int height = (int)GetHeight(new Vector2Int(chunkCoords.x + x, chunkCoords.z + z));
-
-				if (height >= chunkCoords.y + Chunk.Dimensions.y) {
-					chunk.FillRange(new Vector3Int(x, 0, z), new Vector3Int(x, Chunk.Dimensions.y - 1, z), 105, 105, 105);
-				} else if (height >= chunkCoords.y) {
-					int localHeight = height - chunkCoords.y;
-					chunk.FillRange(new Vector3Int(x, 0, z), new Vector3Int(x, localHeight, z), 105, 105, 105);
-				}
+				heightMap[x, z] = noiseFilter.EvaluateNoise(sampleBase + new Vector2(x, z));
 			}
 		}
 
-		return chunk;
+		heightMaps.Add(flatIndex, heightMap);
 	}
 
-	public void Clear() => heightMap.Clear();
+	public Vector2Int GetVectorXZ(Vector3Int vector) => new Vector2Int(vector.x, vector.z);
+	public void Clear() => heightMaps.Clear();
+	public void Remove(Vector2Int key) => heightMaps.Remove(key);
+	public void Remove(Vector3Int chunk) => heightMaps.Remove(GetVectorXZ(chunk));
 }

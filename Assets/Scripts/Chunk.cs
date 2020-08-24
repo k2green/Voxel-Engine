@@ -9,6 +9,9 @@ public class Chunk {
 
 	public static Vector3Int Dimensions => new Vector3Int(ChunkSize, ChunkSize, ChunkSize);
 
+	public Vector3Int ChunkIndex { get; }
+	public Vector3Int ChunkCoord { get; }
+
 	private Voxel[,,] voxels;
 
 
@@ -21,8 +24,37 @@ public class Chunk {
 		return true;
 	}
 
-	public Chunk() {
+	public Chunk(Vector3Int chunkIndex) {
 		voxels = new Voxel[Dimensions.x, Dimensions.y, Dimensions.z];
+
+		ChunkIndex = chunkIndex;
+		ChunkCoord = new Vector3Int(chunkIndex.x * Chunk.Dimensions.x, chunkIndex.y * Chunk.Dimensions.y, chunkIndex.z * Chunk.Dimensions.z);
+	}
+
+	public void LoadChunk(WorldGenerator generator) {
+		var chunkCoord = new Vector3Int(ChunkIndex.x * Chunk.Dimensions.x, ChunkIndex.y * Chunk.Dimensions.y, ChunkIndex.z * Chunk.Dimensions.z);
+		var heightMap = generator.GetHeightMap(ChunkIndex);
+
+		for (int z = 0; z < Chunk.Dimensions.z; z++) {
+			for (int x = 0; x < Chunk.Dimensions.x; x++) {
+				int height = (int)heightMap[x, z];
+
+				if (height >= chunkCoord.y + Chunk.Dimensions.y + 3) {
+					FillRange(new Vector3Int(x, 0, z), new Vector3Int(x, 15, z), 105, 105, 105);
+				} else if (height >= chunkCoord.y + Chunk.Dimensions.y) {
+					var newHeight = height - chunkCoord.y - 3;
+					FillRange(new Vector3Int(x, 0, z), new Vector3Int(x, newHeight, z), 105, 105, 105);
+					FillRange(new Vector3Int(x, newHeight + 1, z), new Vector3Int(x, 15, z), 50, 205, 50);
+				} else if (height >= chunkCoord.y + 3) {
+					var newHeight = height - chunkCoord.y - 3;
+					FillRange(new Vector3Int(x, 0, z), new Vector3Int(x, newHeight, z), 105, 105, 105);
+					FillRange(new Vector3Int(x, newHeight + 1, z), new Vector3Int(x, newHeight + 3, z), 50, 205, 50);
+				} else if (height >= chunkCoord.y) {
+					var newHeight = height - chunkCoord.y;
+					FillRange(new Vector3Int(x, 0, z), new Vector3Int(x, newHeight, z), 50, 205, 50);
+				}
+			}
+		}
 	}
 
 	public bool ContainsIndex(Vector3Int index) =>

@@ -8,14 +8,14 @@ public abstract class NoiseFilter : ScriptableObject {
 
 	public float EvaluateNoise(Vector2 position) {
 		float noiseVal = 0;
-		float frequency = settings.baseScale;
+		float frequency = settings.baseFrequency;
 		float amplitude = 1;
 
 		for(int i = 0; i < settings.numberOfLayers; i++) {
-			float val = Evaluate(position * frequency + settings.offset);
+			float val = Evaluate(position / settings.scale * frequency + settings.offset);
 			noiseVal += val * amplitude;
 
-			frequency *= settings.scaleFactor;
+			frequency *= settings.frequencyScale;
 			amplitude *= settings.persistance;
 		}
 

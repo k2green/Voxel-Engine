@@ -4,11 +4,16 @@ using UnityEngine;
 
 [System.Serializable]
 public class NoiseSettings {
+	[Header("Global Settings")]
+	public float strength = 1;
+	public float scale = 50;
+	public Vector2 offset;
+
+	[Header("Layer Settings")]
 	[Range(1, 8)]
 	public int numberOfLayers = 1;
-	public float strength = 1;
-	public float baseScale = 1;
-	public float scaleFactor = 2;
+
+	public float baseFrequency = 1;
+	public float frequencyScale = 2;
 	public float persistance = .5f;
-	public Vector2 offset;
 }
