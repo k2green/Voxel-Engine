@@ -1,11 +1,16 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using Unity.Profiling;
 using UnityEngine;
 
 public class World : MonoBehaviour {
 
 	public static World Instance { get; private set; }
+
+	static ProfilerMarker s_LoadChunks = new ProfilerMarker("World.LoadChunks");
+	static ProfilerMarker s_UpdateChunks = new ProfilerMarker("World.UpdateChunks");
+	static ProfilerMarker s_UnloadChunks = new ProfilerMarker("World.UnloadChunks");
 
 	public NoiseFilter noiseFilter;
 	public Transform playerTransform;
@@ -51,33 +56,30 @@ public class World : MonoBehaviour {
 		loadedChunks.Remove(chunkIndex);
 	}
 
-	private void RecursiveLoad(Vector3Int playerChunkIndex) {
-		var visitedSet = new HashSet<Vector3Int>();
-		RecursiveLoad(playerChunkIndex, playerChunkIndex, ref visitedSet);
-	}
+	private void LoadAround(Vector3Int chunkIndex) {
+		s_LoadChunks.Begin();
 
-	private void RecursiveLoad(Vector3Int chunkIndex, Vector3Int playerChunkIndex, ref HashSet<Vector3Int> visited) {
-		if (visited.Contains(chunkIndex) || Vector3.Distance(chunkIndex, playerChunkIndex) >= loadRange) return;
+		for(int z = chunkIndex.z - loadRange; z <= chunkIndex.z + loadRange; z++) {
+			for (int y = chunkIndex.y - loadRange; y <= chunkIndex.y + loadRange; y++) {
+				for (int x = chunkIndex.x - loadRange; x <= chunkIndex.x + loadRange; x++) {
+					var currentIndex = new Vector3Int(x, y, z);
 
-		if (!loadedChunks.ContainsKey(chunkIndex))
-			LoadChunk(chunkIndex);
+					if(Vector3.Distance(currentIndex, chunkIndex) <= loadRange && !loadedChunks.ContainsKey(currentIndex)) {
+						LoadChunk(currentIndex);
+					}
+				}
+			}
+		}
 
-		visited.Add(chunkIndex);
-
-		RecursiveLoad(chunkIndex + new Vector3Int(1, 0, 0), playerChunkIndex, ref visited);
-		RecursiveLoad(chunkIndex + new Vector3Int(0, 1, 0), playerChunkIndex, ref visited);
-		RecursiveLoad(chunkIndex + new Vector3Int(0, 0, 1), playerChunkIndex, ref visited);
-
-		RecursiveLoad(chunkIndex + new Vector3Int(-1, 0, 0), playerChunkIndex, ref visited);
-		RecursiveLoad(chunkIndex + new Vector3Int(0, -1, 0), playerChunkIndex, ref visited);
-		RecursiveLoad(chunkIndex + new Vector3Int(0, 0, -1), playerChunkIndex, ref visited);
+		s_LoadChunks.End();
 	}
 
 	private void Update() {
 		var playerChunk = WorldToChunkCoord(playerTransform.position);
 
-		RecursiveLoad(playerChunk);
+		LoadAround(playerChunk);
 
+		s_UpdateChunks.Begin();
 		foreach (Vector3Int chunkIndex in loadedChunks.Keys) {
 			if (Vector3.Distance(chunkIndex, playerChunk) >= loadRange) {
 				markedForUnload.Add(chunkIndex);
@@ -93,12 +95,15 @@ public class World : MonoBehaviour {
 				}
 			}
 		}
+		s_UpdateChunks.End();
 
+		s_UnloadChunks.Begin();
 		foreach (Vector3Int chunkIndex in markedForUnload) {
 			UnloadChunk(chunkIndex);
 		}
 
 		markedForUnload.Clear();
+		s_UnloadChunks.End();
 	}
 
 	private bool CreateChunkObject(Vector3Int chunkIndex) {
