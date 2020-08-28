@@ -13,9 +13,10 @@ MonoBehaviour:
   m_Name: PerlinNoise
   m_EditorClassIdentifier: 
   settings:
-    numberOfLayers: 1
-    strength: 1
-    baseScale: 1
-    scaleFactor: 2
-    persistance: 0.5
+    strength: 30
+    scale: 200
     offset: {x: 0, y: 0}
+    numberOfLayers: 3
+    baseFrequency: 1
+    frequencyScale: 3
+    persistance: 0.4

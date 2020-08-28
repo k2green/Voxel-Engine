@@ -2,11 +2,12 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-[RequireComponent(typeof(MeshFilter), typeof(MeshRenderer))]
+[RequireComponent(typeof(MeshFilter), typeof(MeshRenderer), typeof(MeshCollider))]
 public class ChunkObject : MonoBehaviour {
 
 	private MeshFilter meshFilter;
 	private MeshRenderer meshRenderer;
+	private MeshCollider meshCollider;
 	private Chunk chunk;
 
 	public bool IsDirty { get; private set; }
@@ -31,6 +32,7 @@ public class ChunkObject : MonoBehaviour {
 	public void Initialise() {
 		meshFilter = GetComponent<MeshFilter>();
 		meshRenderer = GetComponent<MeshRenderer>();
+		meshCollider = GetComponent<MeshCollider>();
 
 		if (meshFilter.sharedMesh == null)
 			meshFilter.sharedMesh = new Mesh();
@@ -38,6 +40,7 @@ public class ChunkObject : MonoBehaviour {
 		if (meshRenderer.sharedMaterial == null)
 			meshRenderer.sharedMaterial = new Material(Shader.Find("Shader Graphs/VoxelShader"));
 
+		//meshCollider.convex = true;
 		gameObject.SetActive(false);
 	}
 
@@ -54,6 +57,9 @@ public class ChunkObject : MonoBehaviour {
 
 	public void UpdateMesh() {
 		chunk.GenerateMesh().ApplyTo(meshFilter.sharedMesh);
+
+		meshCollider.sharedMesh = meshFilter.sharedMesh;
+
 		IsDirty = false;
 	}
 }

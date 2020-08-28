@@ -1,6 +1,8 @@
 ﻿using System;
+using System.Linq;
 using System.Collections;
 using System.Collections.Generic;
+using Unity.Profiling;
 using UnityEngine;
 
 public class Chunk {
@@ -9,10 +11,13 @@ public class Chunk {
 
 	public static Vector3Int Dimensions => new Vector3Int(ChunkSize, ChunkSize, ChunkSize);
 
+	static ProfilerMarker HeightMap = new ProfilerMarker("World.HeightMap");
+	static ProfilerMarker FillChunk = new ProfilerMarker("World.FillChunk");
+
 	public Vector3Int ChunkIndex { get; }
 	public Vector3Int ChunkCoord { get; }
 
-	private Voxel[,,] voxels;
+	private Voxel[] voxels;
 
 
 	public bool IsEmpty() {
@@ -25,56 +30,71 @@ public class Chunk {
 	}
 
 	public Chunk(Vector3Int chunkIndex) {
-		voxels = new Voxel[Dimensions.x, Dimensions.y, Dimensions.z];
+		voxels = new Voxel[Dimensions.x * Dimensions.y * Dimensions.z];
 
 		ChunkIndex = chunkIndex;
 		ChunkCoord = new Vector3Int(chunkIndex.x * Chunk.Dimensions.x, chunkIndex.y * Chunk.Dimensions.y, chunkIndex.z * Chunk.Dimensions.z);
 	}
 
+	public int GetDepth(int worldY, int heightVal) {
+		return worldY - heightVal;
+	}
+
+	private int GetHeight(float[,] heightMap, int localX, int localZ) {
+		return (int)heightMap[localX, localZ];
+	}
+
 	public void LoadChunk(WorldGenerator generator) {
-		var chunkCoord = new Vector3Int(ChunkIndex.x * Chunk.Dimensions.x, ChunkIndex.y * Chunk.Dimensions.y, ChunkIndex.z * Chunk.Dimensions.z);
-		var heightMap = generator.GetHeightMap(ChunkIndex);
+		using (FillChunk.Auto()) {
+			var (minimum, heights) = generator.GetHeightMap(ChunkIndex);
 
-		for (int z = 0; z < Chunk.Dimensions.z; z++) {
-			for (int x = 0; x < Chunk.Dimensions.x; x++) {
-				int height = (int)heightMap[x, z];
+			if (minimum < ChunkCoord.y + 2 * Chunk.Dimensions.y) {
+				for (int z = 0; z < Chunk.Dimensions.z; z++) {
+					for (int y = 0; y < Chunk.Dimensions.y; y++) {
+						for (int x = 0; x < Chunk.Dimensions.x; x++) {
+							var height = GetHeight(heights, x, z);
+							var depth = GetDepth(ChunkCoord.y + y, height);
 
-				if (height >= chunkCoord.y + Chunk.Dimensions.y + 3) {
-					FillRange(new Vector3Int(x, 0, z), new Vector3Int(x, 15, z), 105, 105, 105);
-				} else if (height >= chunkCoord.y + Chunk.Dimensions.y) {
-					var newHeight = height - chunkCoord.y - 3;
-					FillRange(new Vector3Int(x, 0, z), new Vector3Int(x, newHeight, z), 105, 105, 105);
-					FillRange(new Vector3Int(x, newHeight + 1, z), new Vector3Int(x, 15, z), 50, 205, 50);
-				} else if (height >= chunkCoord.y + 3) {
-					var newHeight = height - chunkCoord.y - 3;
-					FillRange(new Vector3Int(x, 0, z), new Vector3Int(x, newHeight, z), 105, 105, 105);
-					FillRange(new Vector3Int(x, newHeight + 1, z), new Vector3Int(x, newHeight + 3, z), 50, 205, 50);
-				} else if (height >= chunkCoord.y) {
-					var newHeight = height - chunkCoord.y;
-					FillRange(new Vector3Int(x, 0, z), new Vector3Int(x, newHeight, z), 50, 205, 50);
+							if (depth < -3) {
+								this[x, y, z] = new Voxel(105, 105, 105);
+							} else if (depth <= 0) {
+								this[x, y, z] = new Voxel(50, 205, 50);
+							}
+						}
+					}
 				}
 			}
 		}
 	}
 
-	public bool ContainsIndex(Vector3Int index) =>
-		index.x >= 0 && index.x < Dimensions.x &&
-		index.y >= 0 && index.y < Dimensions.y &&
-		index.z >= 0 && index.z < Dimensions.z;
+	public void SetVoxel(int index, Voxel voxel) {
+		voxels[index] = voxel;
+	}
+
+	public bool ContainsIndex(int x, int y, int z) => x >= 0 && x < Dimensions.x && y >= 0 && y < Dimensions.y && z >= 0 && z < Dimensions.z;
 
 	public Voxel this[Vector3Int index] {
+		get => this[index.x, index.y, index.z];
+		set => this[index.x, index.y, index.z] = value;
+	}
+
+	public Voxel this[int x, int y, int z] {
 		get {
-			if (!ContainsIndex(index))
+			if (!ContainsIndex(x, y, z))
 				return new Voxel(0, 0, 0, 0);
 
-			return voxels[index.x, index.y, index.z];
+			return voxels[FlattenIndex(x, y, z)];
 		}
 		set {
-			if (!ContainsIndex(index))
-				throw new IndexOutOfRangeException($"Index {index} is out of range of chunk with dimensions {Dimensions}");
+			if (!ContainsIndex(x, y, z))
+				throw new IndexOutOfRangeException($"Index ({x}, {y}, {z}) is out of range of chunk with dimensions {Dimensions}");
 
-			voxels[index.x, index.y, index.z] = value;
+			voxels[FlattenIndex(x, y, z)] = value;
 		}
+	}
+
+	private int FlattenIndex(int x, int y, int z) {
+		return z * Chunk.Dimensions.x * Chunk.Dimensions.y + y * Chunk.Dimensions.x + x;
 	}
 
 	public void FillRange(Vector3Int start, Vector3Int end, byte r, byte g, byte b, byte a = 255) {
@@ -174,5 +194,14 @@ public class Chunk {
 	private bool IsFaceVisible(Vector3Int voxelPos, int axis, bool isBackFace) {
 		voxelPos[axis] += isBackFace ? -1 : 1;
 		return this[voxelPos].IsTransparent;
+	}
+
+	public byte[] Serialise() {
+		var bytes = new List<byte>();
+
+		foreach (var voxel in voxels)
+			bytes.AddRange(voxel.ToBytes());
+
+		return bytes.ToArray();
 	}
 }

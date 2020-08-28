@@ -20,6 +20,8 @@ public struct Voxel {
 		A = a;
 	}
 
+	public IEnumerable<byte> ToBytes() => new byte[] { R, G, B, A };
+
 	public Voxel(Color32 color) : this(color.r, color.g, color.b, color.a) { }
 
 	public Color32 GetColor() => new Color32(R, G, B, A);

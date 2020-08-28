@@ -20,6 +20,7 @@ public class ChunkPool {
 
 		gameObj.AddComponent<MeshFilter>();
 		gameObj.AddComponent<MeshRenderer>();
+		gameObj.AddComponent<MeshCollider>();
 
 		var chunkObj = gameObj.AddComponent<ChunkObject>();
 		chunkObj.Initialise();
@@ -30,8 +31,8 @@ public class ChunkPool {
 	public bool TryGetPooledObject(out ChunkObject chunk) {
 		chunk = null;
 
-		foreach(var obj in pooledObjects) {
-			if(!obj.gameObject.activeInHierarchy) {
+		foreach (var obj in pooledObjects) {
+			if (!obj.gameObject.activeInHierarchy) {
 				chunk = obj;
 				return true;
 			}

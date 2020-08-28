@@ -8,9 +8,8 @@ public class World : MonoBehaviour {
 
 	public static World Instance { get; private set; }
 
-	static ProfilerMarker s_LoadChunks = new ProfilerMarker("World.LoadChunks");
-	static ProfilerMarker s_UpdateChunks = new ProfilerMarker("World.UpdateChunks");
-	static ProfilerMarker s_UnloadChunks = new ProfilerMarker("World.UnloadChunks");
+	static ProfilerMarker UpdateChunks = new ProfilerMarker("World.UpdateChunks");
+	static ProfilerMarker UnloadChunks = new ProfilerMarker("World.UnloadChunks");
 
 	public NoiseFilter noiseFilter;
 	public Transform playerTransform;
@@ -57,8 +56,6 @@ public class World : MonoBehaviour {
 	}
 
 	private void LoadAround(Vector3Int chunkIndex) {
-		s_LoadChunks.Begin();
-
 		for(int z = chunkIndex.z - loadRange; z <= chunkIndex.z + loadRange; z++) {
 			for (int y = chunkIndex.y - loadRange; y <= chunkIndex.y + loadRange; y++) {
 				for (int x = chunkIndex.x - loadRange; x <= chunkIndex.x + loadRange; x++) {
@@ -70,8 +67,6 @@ public class World : MonoBehaviour {
 				}
 			}
 		}
-
-		s_LoadChunks.End();
 	}
 
 	private void Update() {
@@ -79,7 +74,7 @@ public class World : MonoBehaviour {
 
 		LoadAround(playerChunk);
 
-		s_UpdateChunks.Begin();
+		UpdateChunks.Begin();
 		foreach (Vector3Int chunkIndex in loadedChunks.Keys) {
 			if (Vector3.Distance(chunkIndex, playerChunk) >= loadRange) {
 				markedForUnload.Add(chunkIndex);
@@ -95,15 +90,15 @@ public class World : MonoBehaviour {
 				}
 			}
 		}
-		s_UpdateChunks.End();
+		UpdateChunks.End();
 
-		s_UnloadChunks.Begin();
+		UnloadChunks.Begin();
 		foreach (Vector3Int chunkIndex in markedForUnload) {
 			UnloadChunk(chunkIndex);
 		}
 
 		markedForUnload.Clear();
-		s_UnloadChunks.End();
+		UnloadChunks.End();
 	}
 
 	private bool CreateChunkObject(Vector3Int chunkIndex) {
