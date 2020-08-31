@@ -11,9 +11,6 @@ public class Chunk {
 
 	public static Vector3Int Dimensions => new Vector3Int(ChunkSize, ChunkSize, ChunkSize);
 
-	static ProfilerMarker HeightMap = new ProfilerMarker("World.HeightMap");
-	static ProfilerMarker FillChunk = new ProfilerMarker("World.FillChunk");
-
 	public Vector3Int ChunkIndex { get; }
 	public Vector3Int ChunkCoord { get; }
 
@@ -34,37 +31,6 @@ public class Chunk {
 
 		ChunkIndex = chunkIndex;
 		ChunkCoord = new Vector3Int(chunkIndex.x * Chunk.Dimensions.x, chunkIndex.y * Chunk.Dimensions.y, chunkIndex.z * Chunk.Dimensions.z);
-	}
-
-	public int GetDepth(int worldY, int heightVal) {
-		return worldY - heightVal;
-	}
-
-	private int GetHeight(float[,] heightMap, int localX, int localZ) {
-		return (int)heightMap[localX, localZ];
-	}
-
-	public void LoadChunk(WorldGenerator generator) {
-		using (FillChunk.Auto()) {
-			var (minimum, heights) = generator.GetHeightMap(ChunkIndex);
-
-			if (minimum < ChunkCoord.y + 2 * Chunk.Dimensions.y) {
-				for (int z = 0; z < Chunk.Dimensions.z; z++) {
-					for (int y = 0; y < Chunk.Dimensions.y; y++) {
-						for (int x = 0; x < Chunk.Dimensions.x; x++) {
-							var height = GetHeight(heights, x, z);
-							var depth = GetDepth(ChunkCoord.y + y, height);
-
-							if (depth < -3) {
-								this[x, y, z] = new Voxel(105, 105, 105);
-							} else if (depth <= 0) {
-								this[x, y, z] = new Voxel(50, 205, 50);
-							}
-						}
-					}
-				}
-			}
-		}
 	}
 
 	public void SetVoxel(int index, Voxel voxel) {
@@ -203,5 +169,45 @@ public class Chunk {
 			bytes.AddRange(voxel.ToBytes());
 
 		return bytes.ToArray();
+	}
+
+	static ProfilerMarker HeightMap = new ProfilerMarker("World.HeightMap");
+	static ProfilerMarker FillChunk = new ProfilerMarker("World.FillChunk");
+
+	public static Chunk GenerateChunk(Vector3Int chunkIndex, WorldGenerator generator) {
+		var chunk = new Chunk(chunkIndex);
+
+		using (FillChunk.Auto()) {
+			var chunkCoord = new Vector3Int(chunkIndex.x * Chunk.Dimensions.z, chunkIndex.y * Chunk.Dimensions.y, chunkIndex.z * Chunk.Dimensions.z);
+			var (minimum, heights) = generator.GetHeightMap(chunkIndex);
+
+			if (minimum < chunkCoord.y + 2 * Chunk.Dimensions.y) {
+				for (int z = 0; z < Dimensions.z; z++) {
+					for (int x = 0; x < Dimensions.x; x++) {
+						var height = GetHeight(heights, x, z);
+
+						for (int y = 0; y < Dimensions.y; y++) {
+							var depth = GetDepth(chunkCoord.y + y, height);
+
+							if (depth < -3) {
+								chunk[x, y, z] = new Voxel(105, 105, 105);
+							} else if (depth <= 0) {
+								chunk[x, y, z] = new Voxel(50, 205, 50);
+							}
+						}
+					}
+				}
+			}
+		}
+
+		return chunk;
+	}
+
+	public static int GetDepth(int worldY, int heightVal) {
+		return worldY - heightVal;
+	}
+
+	private static int GetHeight(float[,] heightMap, int localX, int localZ) {
+		return (int)heightMap[localX, localZ];
 	}
 }

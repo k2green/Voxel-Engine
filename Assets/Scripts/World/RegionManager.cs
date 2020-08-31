@@ -2,28 +2,56 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
+using Unity.Profiling;
 using UnityEngine;
 
 public class RegionManager : MonoBehaviour {
 
 	public NoiseFilter noiseFilter;
 	public string worldName = "World";
+	public Transform playerTransform;
 
 	private WorldGenerator worldGenerator;
 	private Dictionary<Vector3Int, Region> regions;
-	private Transform playerTransform;
 
-	private static string documentsPath = System.Environment.GetFolderPath(System.Environment.SpecialFolder.MyDocuments);
+	private static string documentsPath = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
 
 	// Start is called before the first frame update
 	void Start() {
 		worldGenerator = new WorldGenerator(noiseFilter);
 		regions = new Dictionary<Vector3Int, Region>();
 	}
-
+	
 	// Update is called once per frame
-	void Update() {
+	void LateUpdate() {
+		var markedForUnload = new HashSet<Vector3Int>();
+		var playerChunk = GetPlayerChunk();
 
+		foreach (var index in regions.Keys) {
+			var centreChunk = (index + Vector3.one * .5f) * Region.RegionSize;
+
+			if (Vector3.Distance(centreChunk, playerChunk) > Region.RegionSize)
+				markedForUnload.Add(index);
+		}
+
+		foreach (var index in markedForUnload) {
+			UnloadRegion(index);
+		}
+	}
+
+	private void OnDestroy() {
+		foreach (var index in regions.Keys)
+			SaveRegion(index);
+	}
+
+	public Vector3Int GetPlayerChunk() {
+		var chunkIndex = new Vector3Int();
+
+		for (int i = 0; i < 3; i++) {
+			chunkIndex[i] = Mathf.FloorToInt(playerTransform.position[i] / Chunk.Dimensions[i]);
+		}
+
+		return chunkIndex;
 	}
 
 	public Chunk GetChunk(Vector3Int chunkIndex) {
@@ -33,7 +61,7 @@ public class RegionManager : MonoBehaviour {
 			LoadRegion(regionIndex);
 		}
 
-		return regions[regionIndex].GetChunk(chunkIndex);
+		return regions[regionIndex].GetChunk(chunkIndex, worldGenerator);
 	}
 
 	private void LoadRegion(Vector3Int regionIndex) {
@@ -47,14 +75,15 @@ public class RegionManager : MonoBehaviour {
 			var fileInfo = new FileInfo(regionFile);
 
 			if (fileInfo.Exists) {
+				Debug.Log("Loading region");
 				var bytes = File.ReadAllBytes(regionFile);
-				regions.Add(regionIndex, Region.FromBytes(bytes, worldGenerator));
+				regions.Add(regionIndex, Region.FromBytes(bytes, regionIndex));
 
 				return;
 			}
 		}
 
-		regions.Add(regionIndex, new Region(worldGenerator));
+		regions.Add(regionIndex, new Region(regionIndex));
 	}
 
 	private void UnloadRegion(Vector3Int regionIndex) {

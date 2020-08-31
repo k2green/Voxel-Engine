@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using Unity.Profiling;
 using UnityEngine;
 
+[RequireComponent(typeof(RegionManager))]
 public class World : MonoBehaviour {
 
 	public static World Instance { get; private set; }
@@ -11,57 +12,46 @@ public class World : MonoBehaviour {
 	static ProfilerMarker UpdateChunks = new ProfilerMarker("World.UpdateChunks");
 	static ProfilerMarker UnloadChunks = new ProfilerMarker("World.UnloadChunks");
 
-	public NoiseFilter noiseFilter;
-	public Transform playerTransform;
 	public int loadRange = 3;
 
-	private WorldGenerator worldGen;
+	private RegionManager regionManager;
 	private ChunkPool chunkPool;
-	private Dictionary<Vector3Int, Chunk> loadedChunks;
 	private Dictionary<Vector3Int, ChunkObject> visibleChunks;
 	private HashSet<Vector3Int> markedForUnload;
 
 	private void Start() {
 		Instance = this;
 
-		worldGen = new WorldGenerator(noiseFilter);
+		regionManager = GetComponent<RegionManager>();
+
 		chunkPool = new ChunkPool((int)Mathf.Pow(loadRange * 2, 3), transform);
-		loadedChunks = new Dictionary<Vector3Int, Chunk>();
 		visibleChunks = new Dictionary<Vector3Int, ChunkObject>();
 		markedForUnload = new HashSet<Vector3Int>();
 	}
 
 	public Voxel GetVoxelAt(Vector3 worldPos) {
 		var chunkIndex = WorldToChunkCoord(worldPos);
-
-		if (!loadedChunks.ContainsKey(chunkIndex))
-			return new Voxel(0, 0, 0, 0);
-
 		var posInChunk = ModElements(FloorToInt(worldPos), Chunk.Dimensions);
-		return loadedChunks[chunkIndex][posInChunk];
+
+		return regionManager.GetChunk(chunkIndex)[posInChunk];
 	}
 
 	public void LoadChunk(Vector3Int chunkIndex) {
-		loadedChunks.Add(chunkIndex, new Chunk(chunkIndex));
-		loadedChunks[chunkIndex].LoadChunk(worldGen);
+		CreateChunkObject(chunkIndex);
 	}
 
 	public void UnloadChunk(Vector3Int chunkIndex) {
-		if (visibleChunks.ContainsKey(chunkIndex)) {
-			visibleChunks[chunkIndex].Clear();
-			visibleChunks.Remove(chunkIndex);
-		}
-
-		loadedChunks.Remove(chunkIndex);
+		visibleChunks[chunkIndex].Clear();
+		visibleChunks.Remove(chunkIndex);
 	}
 
 	private void LoadAround(Vector3Int chunkIndex) {
-		for(int z = chunkIndex.z - loadRange; z <= chunkIndex.z + loadRange; z++) {
+		for (int z = chunkIndex.z - loadRange; z <= chunkIndex.z + loadRange; z++) {
 			for (int y = chunkIndex.y - loadRange; y <= chunkIndex.y + loadRange; y++) {
 				for (int x = chunkIndex.x - loadRange; x <= chunkIndex.x + loadRange; x++) {
 					var currentIndex = new Vector3Int(x, y, z);
 
-					if(Vector3.Distance(currentIndex, chunkIndex) <= loadRange && !loadedChunks.ContainsKey(currentIndex)) {
+					if (Vector3.Distance(currentIndex, chunkIndex) <= loadRange && !visibleChunks.ContainsKey(currentIndex)) {
 						LoadChunk(currentIndex);
 					}
 				}
@@ -70,19 +60,15 @@ public class World : MonoBehaviour {
 	}
 
 	private void Update() {
-		var playerChunk = WorldToChunkCoord(playerTransform.position);
+		var playerChunk = regionManager.GetPlayerChunk();
 
 		LoadAround(playerChunk);
 
 		UpdateChunks.Begin();
-		foreach (Vector3Int chunkIndex in loadedChunks.Keys) {
+		foreach (Vector3Int chunkIndex in visibleChunks.Keys) {
 			if (Vector3.Distance(chunkIndex, playerChunk) >= loadRange) {
 				markedForUnload.Add(chunkIndex);
 			} else {
-				if (!visibleChunks.ContainsKey(chunkIndex))
-					if (!CreateChunkObject(chunkIndex))
-						continue;
-
 				var chunkObj = visibleChunks[chunkIndex];
 
 				if (chunkObj.IsDirty) {
@@ -108,7 +94,7 @@ public class World : MonoBehaviour {
 			chunkObj.transform.position = worldPos;
 			chunkObj.gameObject.SetActive(true);
 
-			chunkObj.Setup(loadedChunks[chunkIndex]);
+			chunkObj.Setup(regionManager.GetChunk(chunkIndex));
 
 			visibleChunks.Add(chunkIndex, chunkObj);
 			return true;

@@ -6,24 +6,27 @@ using UnityEngine;
 
 public class Region {
 	public const int RegionSize = 32;
-	private readonly WorldGenerator worldGenerator;
+
+	public Vector3Int CentreOfRegion { get; private set; }
+
 	private Dictionary<Vector3Int, Chunk> regionChunks;
 
-	public Region(WorldGenerator generator) {
+	public Region(Vector3Int regionIndex) {
+		CentreOfRegion = regionIndex * RegionSize + Vector3Int.one * RegionSize / 2;
+
 		regionChunks = new Dictionary<Vector3Int, Chunk>();
-		worldGenerator = generator;
 	}
 
-	public Chunk GetChunk(Vector3Int chunkIndex) {
+	public Chunk GetChunk(Vector3Int chunkIndex, WorldGenerator worldGen) {
 		if (!regionChunks.ContainsKey(chunkIndex)) {
-			regionChunks.Add(chunkIndex, new Chunk(chunkIndex));
+			regionChunks.Add(chunkIndex, Chunk.GenerateChunk(chunkIndex, worldGen));
 		}
 
 		return regionChunks[chunkIndex];
 	}
 
 	public Chunk this[Vector3Int index] {
-		get => GetChunk(index);
+		get => regionChunks[index];
 		set {
 			if (regionChunks.ContainsKey(index))
 				regionChunks.Remove(index);
@@ -59,11 +62,11 @@ public class Region {
 	}
 
 	public static string GetRegionFileName(Vector3Int regionIndex) {
-		return $"Region-{regionIndex.x}-{regionIndex.y}-{regionIndex.z}.bin";
+		return $"Region-({regionIndex.x})-({regionIndex.y})-({regionIndex.z}).bin";
 	}
 
-	public static Region FromBytes(byte[] bytes, WorldGenerator generator) {
-		var region = new Region(generator);
+	public static Region FromBytes(byte[] bytes, Vector3Int regionIndex) {
+		var region = new Region(regionIndex);
 		var currentIndex = 0;
 
 		while (currentIndex < bytes.Length) {
