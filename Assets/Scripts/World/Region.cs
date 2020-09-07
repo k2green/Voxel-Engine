@@ -75,6 +75,7 @@ public class Region {
 
 			var chunk = DeserializeChunk(bytes, currentIndex, index);
 			currentIndex += Chunk.Dimensions.x * Chunk.Dimensions.y * Chunk.Dimensions.z * 4;
+			chunk.UpdateIsEmpty();
 
 			region[index] = chunk;
 		}

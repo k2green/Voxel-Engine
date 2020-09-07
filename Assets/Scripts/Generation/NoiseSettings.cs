@@ -6,6 +6,7 @@ using UnityEngine;
 public class NoiseSettings {
 	[Header("Global Settings")]
 	public float strength = 1;
+	public int heightOffset = 0;
 	public float scale = 50;
 	public Vector2 offset;
 

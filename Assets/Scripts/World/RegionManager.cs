@@ -10,18 +10,19 @@ public class RegionManager : MonoBehaviour {
 	public NoiseFilter noiseFilter;
 	public string worldName = "World";
 	public Transform playerTransform;
+	public bool regenerate = false;
 
 	private WorldGenerator worldGenerator;
 	private Dictionary<Vector3Int, Region> regions;
 
-	private static string documentsPath = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+	private static string worldsDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Voxel Worlds");
 
 	// Start is called before the first frame update
 	void Start() {
 		worldGenerator = new WorldGenerator(noiseFilter);
 		regions = new Dictionary<Vector3Int, Region>();
 	}
-	
+
 	// Update is called once per frame
 	void LateUpdate() {
 		var markedForUnload = new HashSet<Vector3Int>();
@@ -67,19 +68,21 @@ public class RegionManager : MonoBehaviour {
 	private void LoadRegion(Vector3Int regionIndex) {
 		if (regions.ContainsKey(regionIndex)) return;
 
-		var worldPath = Path.Combine(documentsPath, worldName);
-		var worldDirInfo = new DirectoryInfo(worldPath);
+		if (!regenerate) {
+			var worldPath = Path.Combine(worldsDirectory, worldName);
+			var worldDirInfo = new DirectoryInfo(worldPath);
 
-		if (worldDirInfo.Exists) {
-			var regionFile = Path.Combine(worldPath, Region.GetRegionFileName(regionIndex));
-			var fileInfo = new FileInfo(regionFile);
+			if (worldDirInfo.Exists) {
+				var regionFile = Path.Combine(worldPath, Region.GetRegionFileName(regionIndex));
+				var fileInfo = new FileInfo(regionFile);
 
-			if (fileInfo.Exists) {
-				Debug.Log("Loading region");
-				var bytes = File.ReadAllBytes(regionFile);
-				regions.Add(regionIndex, Region.FromBytes(bytes, regionIndex));
+				if (fileInfo.Exists) {
+					Debug.Log("Loading region");
+					var bytes = File.ReadAllBytes(regionFile);
+					regions.Add(regionIndex, Region.FromBytes(bytes, regionIndex));
 
-				return;
+					return;
+				}
 			}
 		}
 
@@ -94,7 +97,7 @@ public class RegionManager : MonoBehaviour {
 	}
 
 	private void SaveRegion(Vector3Int regionIndex) {
-		var worldPath = Path.Combine(documentsPath, worldName);
+		var worldPath = Path.Combine(worldsDirectory, worldName);
 		var worldDirInfo = new DirectoryInfo(worldPath);
 
 		if (!worldDirInfo.Exists)

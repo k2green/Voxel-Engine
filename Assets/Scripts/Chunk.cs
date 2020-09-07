@@ -13,17 +13,19 @@ public class Chunk {
 
 	public Vector3Int ChunkIndex { get; }
 	public Vector3Int ChunkCoord { get; }
+	public bool IsEmpty { get; private set; }
 
 	private Voxel[] voxels;
 
-
-	public bool IsEmpty() {
+	public void UpdateIsEmpty() {
 		foreach (var voxel in voxels) {
-			if (voxel.IsVisible)
-				return false;
+			if (voxel.IsVisible) {
+				IsEmpty = false;
+				return;
+			}
 		}
 
-		return true;
+		IsEmpty = true;
 	}
 
 	public Chunk(Vector3Int chunkIndex) {
@@ -199,6 +201,8 @@ public class Chunk {
 				}
 			}
 		}
+
+		chunk.UpdateIsEmpty();
 
 		return chunk;
 	}

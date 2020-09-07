@@ -88,13 +88,15 @@ public class World : MonoBehaviour {
 	}
 
 	private bool CreateChunkObject(Vector3Int chunkIndex) {
-		if (chunkPool.TryGetPooledObject(out var chunkObj)) {
+		var chunk = regionManager.GetChunk(chunkIndex);
+
+		if (!chunk.IsEmpty && chunkPool.TryGetPooledObject(out var chunkObj)) {
 			var worldPos = ChunkToWorldCoord(chunkIndex);
 
 			chunkObj.transform.position = worldPos;
 			chunkObj.gameObject.SetActive(true);
 
-			chunkObj.Setup(regionManager.GetChunk(chunkIndex));
+			chunkObj.Setup(chunk);
 
 			visibleChunks.Add(chunkIndex, chunkObj);
 			return true;
