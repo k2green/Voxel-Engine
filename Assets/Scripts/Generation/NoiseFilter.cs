@@ -19,7 +19,7 @@ public abstract class NoiseFilter : ScriptableObject {
 			amplitude *= settings.persistance;
 		}
 
-		return noiseVal * settings.strength - settings.heightOffset;
+		return noiseVal - settings.heightOffset;
 	}
 
 	protected abstract float Evaluate(Vector2 point);

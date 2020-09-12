@@ -161,7 +161,34 @@ public class Chunk {
 
 	private bool IsFaceVisible(Vector3Int voxelPos, int axis, bool isBackFace) {
 		voxelPos[axis] += isBackFace ? -1 : 1;
-		return this[voxelPos].IsTransparent;
+
+		if (ContainsIndex(voxelPos.x, voxelPos.y, voxelPos.z)) {
+			return !this[voxelPos].IsVisible;
+		} else {
+			var (neighbourChunk, newPos) = GetAdjacentCoords(voxelPos);
+
+			return !RegionManager.Instance.GetChunk(neighbourChunk, false)[newPos].IsVisible;
+		}
+	}
+
+	int CyclicMod(int a, int b) {
+		return a - b * Mathf.FloorToInt((float)a / b);
+	}
+
+	private (Vector3Int, Vector3Int) GetAdjacentCoords(Vector3Int voxelPos) {
+		var chunkIndex = ChunkIndex;
+
+		for (int i = 0; i < 3; i++) {
+			if (voxelPos[i] < 0) {
+				chunkIndex[i] -= 1;
+			} else if (voxelPos[i] >= Chunk.Dimensions[i]) {
+				chunkIndex[i] += 1;
+			}
+
+			voxelPos[i] = CyclicMod(voxelPos[i], Chunk.Dimensions.x);
+		}
+
+		return (chunkIndex, voxelPos);
 	}
 
 	public byte[] Serialise() {
@@ -189,13 +216,17 @@ public class Chunk {
 						var height = GetHeight(heights, x, z);
 
 						for (int y = 0; y < Dimensions.y; y++) {
-							var depth = GetDepth(chunkCoord.y + y, height);
+							var globalY = chunkCoord.y + y;
+							var depth = GetDepth(globalY, height);
 
-							if (depth < -3) {
+							if (depth > 0 && height < 0 && globalY <= 0) {
+								chunk[x, y, z] = new Voxel(0, 255, 255, 100);
+							} else if (depth < -3 || (depth <= 0 && height < 0)) {
 								chunk[x, y, z] = new Voxel(105, 105, 105);
 							} else if (depth <= 0) {
 								chunk[x, y, z] = new Voxel(50, 205, 50);
 							}
+
 						}
 					}
 				}

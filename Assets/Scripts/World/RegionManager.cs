@@ -5,9 +5,11 @@ using System.IO;
 using Unity.Profiling;
 using UnityEngine;
 
+[RequireComponent(typeof(WorldGenerator))]
 public class RegionManager : MonoBehaviour {
 
-	public NoiseFilter noiseFilter;
+	public static RegionManager Instance { get; private set; }
+
 	public string worldName = "World";
 	public Transform playerTransform;
 	public bool regenerate = false;
@@ -19,7 +21,8 @@ public class RegionManager : MonoBehaviour {
 
 	// Start is called before the first frame update
 	void Start() {
-		worldGenerator = new WorldGenerator(noiseFilter);
+		Instance = this;
+		worldGenerator = GetComponent<WorldGenerator>();
 		regions = new Dictionary<Vector3Int, Region>();
 	}
 
@@ -55,11 +58,15 @@ public class RegionManager : MonoBehaviour {
 		return chunkIndex;
 	}
 
-	public Chunk GetChunk(Vector3Int chunkIndex) {
+	public Chunk GetChunk(Vector3Int chunkIndex, bool generate = true) {
 		var regionIndex = ChunkToRegion(chunkIndex);
 
 		if (!regions.ContainsKey(regionIndex)) {
-			LoadRegion(regionIndex);
+			if(generate) {
+				LoadRegion(regionIndex);
+			} else {
+				return new Chunk(chunkIndex);
+			}
 		}
 
 		return regions[regionIndex].GetChunk(chunkIndex, worldGenerator);
