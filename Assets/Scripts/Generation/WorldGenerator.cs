@@ -4,13 +4,35 @@ using UnityEngine;
 
 public class WorldGenerator : MonoBehaviour {
 
+	private const int randomRange = 2000;
+
 	private Dictionary<Vector2Int, (float, float[,])> heightMaps;
 
+	public bool randomizeCentres;
 	public NoiseFilter baseNoiseFilter;
 	public NoiseFilter[] noiseFilters;
 
 	private void Start() {
 		heightMaps = new Dictionary<Vector2Int, (float, float[,])>();
+
+		if (randomizeCentres) {
+			var prng = new System.Random();
+
+			if (baseNoiseFilter != null)
+				RandomiseVector(prng, ref baseNoiseFilter.settings.offset);
+
+			if (noiseFilters != null) {
+				foreach (var filter in noiseFilters) {
+					if (filter != null)
+						RandomiseVector(prng, ref filter.settings.offset);
+				}
+			}
+		}
+	}
+
+	private void RandomiseVector(System.Random prng, ref Vector2 vector) {
+		vector.x = prng.Next(-randomRange, randomRange);
+		vector.y = prng.Next(-randomRange, randomRange);
 	}
 
 	public (float, float[,]) GetHeightMap(Vector3Int chunkIndex) {

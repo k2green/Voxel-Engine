@@ -1,4 +1,5 @@
-﻿using System;
+﻿
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using Unity.Profiling;
@@ -10,6 +11,8 @@ public class World : MonoBehaviour {
 	public static World Instance { get; private set; }
 
 	static ProfilerMarker UpdateChunks = new ProfilerMarker("World.UpdateChunks");
+	static ProfilerMarker ModifyChunks = new ProfilerMarker("World.ModifyChunks");
+	static ProfilerMarker LoadChunks = new ProfilerMarker("World.LoadChunks");
 	static ProfilerMarker UnloadChunks = new ProfilerMarker("World.UnloadChunks");
 
 	public int loadRange = 3;
@@ -17,7 +20,6 @@ public class World : MonoBehaviour {
 	private RegionManager regionManager;
 	private ChunkPool chunkPool;
 	private Dictionary<Vector3Int, ChunkObject> visibleChunks;
-	private HashSet<Vector3Int> markedForUnload;
 
 	private void Start() {
 		Instance = this;
@@ -26,7 +28,6 @@ public class World : MonoBehaviour {
 
 		chunkPool = new ChunkPool((int)Mathf.Pow(loadRange * 2, 3), transform);
 		visibleChunks = new Dictionary<Vector3Int, ChunkObject>();
-		markedForUnload = new HashSet<Vector3Int>();
 	}
 
 	public Voxel GetVoxelAt(Vector3 worldPos) {
@@ -45,30 +46,50 @@ public class World : MonoBehaviour {
 		visibleChunks.Remove(chunkIndex);
 	}
 
-	private void LoadAround(Vector3Int chunkIndex) {
-		for (int z = chunkIndex.z - loadRange; z <= chunkIndex.z + loadRange; z++) {
-			for (int y = chunkIndex.y - loadRange; y <= chunkIndex.y + loadRange; y++) {
-				for (int x = chunkIndex.x - loadRange; x <= chunkIndex.x + loadRange; x++) {
-					var currentIndex = new Vector3Int(x, y, z);
+	private (IEnumerable<Vector3Int>, IEnumerable<Vector3Int>) GetChunksModifyLists(Vector3Int playerChunk) {
+		var chunksToLoad = new HashSet<Vector3Int>();
+		var chunksToUnload = new HashSet<Vector3Int>();
 
-					if (Vector3.Distance(currentIndex, chunkIndex) <= loadRange && !visibleChunks.ContainsKey(currentIndex)) {
-						LoadChunk(currentIndex);
+		foreach (var index in visibleChunks.Keys) {
+			if (Vector3.Distance(index, playerChunk) > loadRange) {
+				chunksToUnload.Add(index);
+			} else {
+				foreach (Direction direction in Enum.GetValues(typeof(Direction))) {
+					var newIndex = index + direction.AsVector();
+
+					if (!visibleChunks.ContainsKey(newIndex) && !chunksToLoad.Contains(newIndex) && Vector3.Distance(playerChunk, newIndex) <= loadRange) {
+						chunksToLoad.Add(newIndex);
 					}
 				}
 			}
 		}
+
+		return (chunksToLoad, chunksToUnload);
 	}
 
 	private void Update() {
-		var playerChunk = regionManager.GetPlayerChunk();
+		IEnumerable<Vector3Int> toLoad;
+		IEnumerable<Vector3Int> toUnload;
 
-		LoadAround(playerChunk);
+		using (ModifyChunks.Auto()) {
+			var playerChunk = regionManager.GetPlayerChunk();
 
-		UpdateChunks.Begin();
-		foreach (Vector3Int chunkIndex in visibleChunks.Keys) {
-			if (Vector3.Distance(chunkIndex, playerChunk) >= loadRange) {
-				markedForUnload.Add(chunkIndex);
-			} else {
+			if (!visibleChunks.ContainsKey(playerChunk))
+				LoadChunk(playerChunk);
+
+			(toLoad, toUnload) = GetChunksModifyLists(playerChunk);
+		}
+
+		using (UnloadChunks.Auto())
+			foreach (var index in toUnload)
+				UnloadChunk(index);
+
+		using (LoadChunks.Auto())
+			foreach (var index in toLoad)
+				LoadChunk(index);
+
+		using (UpdateChunks.Auto()) {
+			foreach (Vector3Int chunkIndex in visibleChunks.Keys) {
 				var chunkObj = visibleChunks[chunkIndex];
 
 				if (chunkObj.IsDirty) {
@@ -76,15 +97,6 @@ public class World : MonoBehaviour {
 				}
 			}
 		}
-		UpdateChunks.End();
-
-		UnloadChunks.Begin();
-		foreach (Vector3Int chunkIndex in markedForUnload) {
-			UnloadChunk(chunkIndex);
-		}
-
-		markedForUnload.Clear();
-		UnloadChunks.End();
 	}
 
 	private bool CreateChunkObject(Vector3Int chunkIndex) {

@@ -35,30 +35,33 @@ public class Region {
 		}
 	}
 
-	private byte[] Serialize() {
-		var list = new List<byte>();
+	private void Serialize(FileStream fileStream) {
+		int current = 0;
 
 		foreach (var index in regionChunks.Keys) {
-			list.AddRange(SerializeVector3Int(index));
-			list.AddRange(regionChunks[index].Serialise());
+			current += SerializeVector3Int(fileStream, current, index);
+			current += SerializeChunk(fileStream, current, regionChunks[index]);
+		}
+	}
+
+	private int SerializeChunk(FileStream fileStream, int current, Chunk chunk) {
+		var bytes = chunk.Serialise();
+		fileStream.Write(bytes, current, bytes.Length);
+		return bytes.Length;
+	}
+
+	private int SerializeVector3Int(FileStream fileStream, int current, Vector3Int vector) {
+		for (int i = 0; i < 3; i++) {
+			int index = current + i * 4;
+			var values = BitConverter.GetBytes(vector[i]);
+			fileStream.Write(values, index, values.Length);
 		}
 
-		return list.ToArray();
+		return 12;
 	}
 
 	public void WriteTo(FileStream fileStream) {
-		var bytes = Serialize();
-		fileStream.Write(bytes, 0, bytes.Length);
-	}
-
-	private byte[] SerializeVector3Int(Vector3Int vector) {
-		var bytes = new byte[12];
-
-		for (int i = 0; i < 3; i++) {
-			BitConverter.GetBytes(vector[i]).CopyTo(bytes, i * 4);
-		}
-
-		return bytes;
+		Serialize(fileStream);
 	}
 
 	public static string GetRegionFileName(Vector3Int regionIndex) {
