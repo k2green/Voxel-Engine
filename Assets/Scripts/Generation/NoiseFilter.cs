@@ -6,7 +6,7 @@ public abstract class NoiseFilter : ScriptableObject {
 
 	public NoiseSettings settings;
 
-	public virtual float EvaluateNoise(Vector2 position) {
+	public virtual float EvaluateNoise(Vector2 position, bool useStrength = true) {
 		float noiseVal = 0;
 		float frequency = settings.baseFrequency;
 		float amplitude = 1;
@@ -19,7 +19,15 @@ public abstract class NoiseFilter : ScriptableObject {
 			amplitude *= settings.persistance;
 		}
 
-		return noiseVal - settings.heightOffset;
+		float outputVal = noiseVal - settings.heightOffset;
+
+		if (settings.clipNegative)
+			outputVal = Mathf.Max(0, outputVal);
+
+		if (useStrength)
+			outputVal += settings.strength;
+
+		return outputVal;
 	}
 
 	protected abstract float Evaluate(Vector2 point);

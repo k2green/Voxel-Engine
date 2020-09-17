@@ -17,4 +17,6 @@ public class NoiseSettings {
 	public float baseFrequency = 1;
 	public float frequencyScale = 2;
 	public float persistance = .5f;
+
+	public bool clipNegative = false;
 }

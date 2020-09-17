@@ -13,11 +13,12 @@ MonoBehaviour:
   m_Name: PeakedMountains
   m_EditorClassIdentifier: 
   settings:
-    strength: 1
-    heightOffset: 0
-    scale: 50
-    offset: {x: 0, y: 0}
-    numberOfLayers: 1
+    strength: 60
+    heightOffset: 0.95
+    scale: 100
+    offset: {x: -1155, y: -565}
+    numberOfLayers: 5
     baseFrequency: 1
     frequencyScale: 2
-    persistance: 0.5
+    persistance: 0.4
+    clipNegative: 0
